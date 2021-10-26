@@ -1,17 +1,14 @@
 import pygame
 import sys
+import json
 from pygame.draw import *
 from random import randint
 pygame.init()
 
 FPS = 120
 screen = pygame.display.set_mode((1200, 900))
-
-A = [0, 0, 0, 0, 0, 0] #массив хранящий данные для шлема
 B = [] #массив хранящий все шлемы
-A1 = [0, 0, 0, 0, 0, 0] #массив хранящий для каркасов
 B1 = [] #массив хранящий каркасы
-
 helmet_surf = pygame.image.load(
             'helmet.png').convert()
 helmet_surf.set_colorkey(
@@ -25,8 +22,8 @@ armor_surf.set_colorkey(
             (0, 0, 0))
 armor_rect = armor_surf.get_rect(
             center=(0, 0))
-
 maxTime = 15000
+maxMiss = 10
 number_helmets = [10, 15]
 number_armors = [5, 8]
 push_button1 = False
@@ -36,10 +33,12 @@ WINPOINTS_helmet = 3
 WINPOINTS_armor = 3 #количество очков, необходимое для победы
 count_helmet = 0 #счетчик колтчества найденных шлемов
 count_armor = 0 #счетчик количества найденных armor
+count_miss = 0 #счетчик кооличества промахов
 speed_armor = [-20, 20]
 speed_helmet = [-15, 15]
 level = 2
-
+Data = []
+name = "Рядовой"
 RED = (255, 0, 0)
 BLUE = (0, 0, 255)
 YELLOW = (255, 255, 0)
@@ -48,6 +47,12 @@ MAGENTA = (255, 0, 255)
 CYAN = (0, 255, 255)
 BLACK = (0, 0, 0)
 COLORS = [RED, BLUE, YELLOW, GREEN, MAGENTA, CYAN]
+if level == 1:
+    lVl = "easy"
+elif level == 2:
+    lVl = "normal"
+elif level == 3:
+    lVl = "hard"
 
 pygame.mixer.music.load("march1.ogg")
 soundstart = pygame.mixer.Sound('start.ogg')
@@ -80,16 +85,9 @@ welcome_serf = pygame.image.load(
 scale_welcome = pygame.transform.scale(
         welcome_serf, (int((welcome_serf.get_width() * 2)),
                    int(welcome_serf.get_height() * 2.2)))
-def table_of_record():
-    f = open('records.txt', 'a')
-    f.write(str(count_armor))
-    f.write(str(count_helmet) + '\n')
-    f = open('records.txt', 'r')
-
 def new_button(x, y, button_size_w, button_size_h, text, button):
     push_button = False
     BUTTON = draw_button(x, y, button_size_w, button_size_h, text)
-
 
 def draw_button(x, y, button_size_w, button_size_h, text):
     BUT = rect(screen, RED, (x, y, button_size_w, button_size_h))
@@ -97,17 +95,20 @@ def draw_button(x, y, button_size_w, button_size_h, text):
     yes_text = fontHead.render(text, True, YELLOW)
     screen.blit(yes_text, (x + button_size_h // 4, y + button_size_w // 25))
     return BUT 
-EASY = draw_button(200, 660, 100, 50, "ЛЕГКИЙ")
+
+EASY = draw_button(200, 660, 100, 50, "ЛЕГКО")
 NORMAL = draw_button(200, 730, 100, 50, "НОРМА")
 HARD = draw_button(200, 800, 100, 50, "СЛОЖНО")
 START = draw_button(400, 650, 400, 100, "Так точон!")
 LEAVE = draw_button(400, 770, 400, 100, "Никак нет.")
 
+
 def difficult(lev):
-    global level, WINPOINTS_helmet, WINPOINTS_armor, speed_armor, speed_helmet
+    global level, WINPOINTS_helmet, WINPOINTS_armor, speed_armor, speed_helmet, count_miss
     if lev == 3:
-        WINPOINTS_helmet = 7
-        WINPOINTS_armor = 7
+        WINPOINTS_helmet = 6
+        WINPOINTS_armor = 6
+        maxMiss = 8
         speed_armor = [-20, 20]
         speed_helmet = [-15, 15]
         level = 3
@@ -117,12 +118,14 @@ def difficult(lev):
         speed_armor = [-15, 15]
         speed_helmet = [-10, 10]
         level = 2
+        maxMiss = 10
     if lev == 1:
         WINPOINTS_helmet = 3
         WINPOINTS_armor = 3
         speed_armor = [-10, 10]
         speed_helmet = [-5, 5]
         level = 1
+        maxMiss = 12
 
 difficult(2) #уровень сложности по дефолту
 
@@ -132,13 +135,15 @@ def score(screen, x, y, font_size):
     helmet_text = "Найдено шлемов: " + str(count_helmet)
     time_text = "Осталось секунд: " + str(round((maxTime - time) // 1000) + 1)
     armor_text = "Найдено каркасов: " + str(count_armor) 
+    miss_text = "Промахов до поражения: " + str(maxMiss - count_miss)
     Time = font2.render(time_text, True, YELLOW)
+    Miss = font2.render(miss_text, True, YELLOW)
     helmet = font2.render(helmet_text, True, YELLOW)
     armor = font2.render(armor_text, True, YELLOW)
-    #Recor = font2.render(RECORDS[0], True, YELLOW)
-    screen.blit(Time, [x, y])
-    screen.blit(helmet, [x, y + 35])
-    screen.blit(armor, [x, y + 70])
+    screen.blit(Miss, [x, y])
+    screen.blit(Time, [x, y + 35])
+    screen.blit(helmet, [x, y + 70])
+    screen.blit(armor, [x, y + 105])
 
 def ending(screen, font_size):
     # функция для завершения игры
@@ -146,10 +151,13 @@ def ending(screen, font_size):
     finished = False
     fontHead = pygame.font.Font(None, font_size)
     winning_text = fontHead.render("ВЫ ОБРАДОВАЛИ ДОРНАНА!", True, RED)
+    table_of_record = fontHead.render("РЕКОРД ПО КОЛИЧЕСТВУ:", True, RED)
     gameover_text = fontHead.render("ВЫ РАЗОЧАРОВАЛИ ДОРНАНА!", True, RED)
+    new_record()
     yourrecord_helmet_text = fontHead.render("Найдено шлемов: " + str(count_helmet), True, RED)
     yourrecord_armor_text = fontHead.render("Найдено каркасов: " + str(count_armor), True, RED)
-    table_of_record()
+    table_of_record_armor_text = fontHead.render("каркасов: " + str((Data['leaders'][lVl][name]['armor'])), True, RED)
+    table_of_record_helmet_text = fontHead.render("шлемов: " + str((Data['leaders'][lVl][name]['helmet'])), True, RED)
     if count_helmet >= WINPOINTS_helmet and count_armor >= WINPOINTS_armor: 
         screen.blit(scale_welcome, (-175, 0))
         screen.blit(winning_text, (10, 20))
@@ -162,7 +170,9 @@ def ending(screen, font_size):
         screen.blit(yourrecord_helmet_text, (10, 70))
         screen.blit(yourrecord_armor_text, (10, 120))
         soundfail.play()
-
+    screen.blit(table_of_record, (860, 20))
+    screen.blit(table_of_record_helmet_text, (1000, 70))
+    screen.blit(table_of_record_armor_text, (1000, 120))
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -187,7 +197,7 @@ def new_armor():
     dy = randint(speed_armor[0], speed_armor[1])
     w = scale_rect[2]
     h = scale_rect[3]
-    B.append([x, y, r, dx, dy, w, h])
+    B.append([x, y, r, dx, dy, w, h, 0, 0])
 
 def drawarmors():
     '''рисует 10-20 шариков'''
@@ -221,9 +231,44 @@ def drawhelmets():
     for i in  range(randint(number_helmets[0], number_helmets[1])):
         new_helmet()
 
+def new_record():
+        global lVl
+        print("Your record: "+str([count_armor,count_helmet]))
+        name = "Рядовой"
+        if level == 1:
+            lVl = "easy"
+        elif level == 2:
+            lVl = "normal"
+        elif level == 3:
+            lVl = "hard"
+        if not(name in Data['leaders'][lVl]):
+            Data['leaders'][lVl][name] = {"armor": 0, "helmet":0 }
+        if Data['leaders'][lVl][name]['armor']<count_armor:
+            Data['leaders'][lVl][name]['armor'] = count_armor
+        if Data['leaders'][lVl][name]['helmet']<count_helmet:
+            Data['leaders'][lVl][name]['helmet'] = count_helmet
+
+        for lev in Data['leaders']:
+            print("\n"+'"'+lev+'"')
+            for res in Data['leaders'][lev]:
+                print(res + " : " + str(Data['leaders'][lev][res]))
+                draw_button(400, 770, 400, 100, (str(Data['leaders'][lVl][name]['armor'])))
+        dataDown()
+
+
+def dataUp():
+    global Data
+    with open("table.json", "r") as read_file: 
+        Data = json.load(read_file)
+
+def dataDown():
+    global Data
+    with open("table.json","w") as write_file:
+        json.dump(Data,write_file) 
+
 def click(event):
     '''удаляет шарики и подсчитывает очки, если на шарик кликнуть'''
-    global count_helmet, count_armor, BUT, push_button1
+    global count_helmet, count_armor, BUT, push_button1, count_miss
     eventx = event.pos[0]
     eventy = event.pos[1]
     sucess = False
@@ -239,8 +284,11 @@ def click(event):
     if push_button1 == True:
         for A in B:   
             if ((A[0] - (A[5] // 2)) <= eventx <= (A[0] + (A[5] // 2))) and (A[1] - (A[6] // 2)) <= eventy <= (A[1] + (A[6] // 2)):
-                count_armor = count_armor + 1
-                B.remove(A)
+                
+                A[7] += 1
+                if A[7] == 2:
+                    count_armor = count_armor + 1
+                    B.remove(A)
                 sucess = True
         for A1 in B1:       
             if ((A1[0] - (A1[5] // 2)) <= eventx <= (A1[0] + (A1[5] // 2))) and (A1[1] - (A1[6] // 2)) <= eventy <= (A1[1] + (A1[6] // 2)):
@@ -248,9 +296,11 @@ def click(event):
                 B1.remove(A1)
                 sucess = True
     if sucess == False and push_button1 == True:
+        count_miss += 1
         sound2.play()
 
 pygame.display.update()
+dataUp()
 clock = pygame.time.Clock()
 finished = False
 soundwelcome.play()
@@ -279,7 +329,16 @@ while not finished:
                        armor_surf.get_height() // A[2]))
             scale_rect_armor = scale_armor.get_rect(
                center=(A[0], A[1]))
-            screen.blit(scale_armor, scale_rect_armor)
+
+            if A[7] == 1:
+                if A[8] == 0:
+                    screen.blit(scale_armor, scale_rect_armor)
+                    A[8] += 1
+                else:
+                    A[8] -=1 
+                    
+            else:
+                screen.blit(scale_armor, scale_rect_armor)
 
         for A1 in B1:
             if (0 >= A1[0]) or (1200 <= A1[0]):
@@ -325,8 +384,11 @@ while not finished:
         time = -1
     else:
         time = pygame.time.get_ticks() - dt
-    if time >= maxTime:
-                ending(screen, 35)
+    if time >= maxTime or count_miss >= maxMiss:
+            if count_miss >= maxMiss:
+                count_helmet = 0
+                count_armor = 0
+            ending(screen, 35)
     pygame.display.update()
     if push_button1 == True:
         screen.blit(scale1, (-475, 0))
@@ -344,3 +406,4 @@ while not finished:
         elif level == 3:
             circle(screen, GREEN, (160, 820), 20)
 pygame.quit()
+
