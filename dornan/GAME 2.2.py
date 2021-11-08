@@ -153,6 +153,7 @@ def ending(screen, font_size):
     winning_text = fontHead.render("ВЫ ОБРАДОВАЛИ ДОРНАНА!", True, RED)
     table_of_record = fontHead.render("РЕКОРД ПО КОЛИЧЕСТВУ:", True, RED)
     gameover_text = fontHead.render("ВЫ РАЗОЧАРОВАЛИ ДОРНАНА!", True, RED)
+    reproof_text = fontHead.render("(За спам очки обнулились)", True, RED)
     new_record()
     yourrecord_helmet_text = fontHead.render("Найдено шлемов: " + str(count_helmet), True, RED)
     yourrecord_armor_text = fontHead.render("Найдено каркасов: " + str(count_armor), True, RED)
@@ -173,6 +174,8 @@ def ending(screen, font_size):
     screen.blit(table_of_record, (860, 20))
     screen.blit(table_of_record_helmet_text, (1000, 70))
     screen.blit(table_of_record_armor_text, (1000, 120))
+    if count_miss >= maxMiss:
+        screen.blit(reproof_text, (10, 45))
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
